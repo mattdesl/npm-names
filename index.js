@@ -1,4 +1,4 @@
-var packages = require('./top-modules')
+var packages = require('./top-modules-trunc')
 var random = require('gl-vec3/random')
 var COUNT = 4000
 
@@ -9,6 +9,7 @@ var Shader = require('./sdf')
 var loadBmFont = require('load-bmfont')
 var tweenr = require('tweenr')()
 var easing = require('eases/expo-in-out')
+var $ = document.querySelector.bind(document)
 
 function loadFont(opt, cb) {
   loadBmFont(opt.font, function(err, font) {
@@ -22,11 +23,24 @@ function loadFont(opt, cb) {
 
 //load up a 'fnt' and texture
 loadFont({ 
-  font: 'DejaVu-sdf.fnt',
-  image: 'DejaVu-sdf.png'
+  font: 'assets/KelsonSans.fnt',
+  image: 'assets/KelsonSans.png'
 }, start)
 
+function event(elem, fn) {
+  var clicker = function (ev) {
+    ev.preventDefault()
+    ev.stopPropagation()
+    fn(ev)
+  }
+  elem.addEventListener('click', clicker)
+  elem.addEventListener('touchstart', clicker)
+}
+
 function start(font, texture) {
+  var link = $('#link')
+  var startPos = new THREE.Vector3(0, 0, -30)
+  
   var app = createOrbitViewer({
       clearColor: 'rgb(40, 40, 40)',
       clearAlpha: 1.0,
@@ -36,8 +50,24 @@ function start(font, texture) {
         depth: true,
         alpha: false
       },
-      position: new THREE.Vector3(0, 0, -30)
+      position: startPos
   })
+  
+  event($('#shuffle'), function () {
+    change()
+  })
+  event($('#zoom'), function () {
+    transitionTo(app.camera.position, startPos)
+  })
+  
+  var gl = app.renderer.getContext()
+  var hasInt = gl.getExtension('OES_element_index_uint')
+  if (!hasInt) {
+    // could be more exact here for older devices
+    // w/o uint32
+    COUNT = Math.min(COUNT, 1000)
+  }
+  
   var maxAni = app.renderer.getMaxAnisotropy()
 
   //setup our texture with some nice mipmapping etc
@@ -50,7 +80,7 @@ function start(font, texture) {
 
   //here we use 'three-bmfont-text/shaders/sdf'
   //to help us build a shader material
-  var material = new THREE.ShaderMaterial(Shader({
+  var material = new THREE.RawShaderMaterial(Shader({
     map: texture,
     smooth: 1/32, //the smooth value for SDF
     side: THREE.DoubleSide,
@@ -75,8 +105,6 @@ function start(font, texture) {
   var allZPos = new Float32Array(4 * charCount)
   
   var tris = charCount * 6
-  var gl = app.renderer.getContext()
-  var hasInt = gl.getExtension('OES_element_index_uint')
   var type = (hasInt && tris > 21845) ? 'uint32' : 'uint16'
   
   var allIndices = require('quad-indices')({
@@ -85,14 +113,17 @@ function start(font, texture) {
   })
   
   var offsetPos = 0
-  var scale = -0.005
+  var scale = -0.009
   var detailLookup = {}
   material.uniforms.wordCount.value = packages.length
   
+  console.log("Total Glyphs", charCount)
+  console.log("Tip:\n  window.change('lodash')")
   packages.forEach(function (name, index) {
     //create our text geometry
     var geom = createText({
       align: 'center',
+      mode: 'pre',
       text: name,  //the string to render
       font: font,  //the bitmap font definition
     })
@@ -101,8 +132,8 @@ function start(font, texture) {
     var positions = geom.attributes.position.array
     var uvs = geom.attributes.uv.array
     
-    var relative = ((1 - index / (packages.length-1)) + 0.25) * (radius*1)
-    var moduleScale = scale * relative
+    var relative = ((1 - index / (packages.length-1)) + 0.025) * (radius*1.025)
+    var moduleScale = scale * 1
     var rnd = random([], 10)
     var rndPos = new THREE.Vector3().fromArray(rnd)
     var obj = new THREE.Object3D()
@@ -122,7 +153,7 @@ function start(font, texture) {
     for (var i=0; i < positions.length/2; i++) {
       // model position
       positions[i * 2 + 0] -= layout.width/2
-      positions[i * 2 + 1] -= layout.height/2
+      positions[i * 2 + 1] += layout.height/2
       positions[i * 2 + 0] *= moduleScale
       positions[i * 2 + 1] *= moduleScale
       
@@ -169,15 +200,19 @@ function start(font, texture) {
   looker.scale.multiplyScalar(0.1)
   looker.visible = false
   
-  setView(packages[Math.floor(Math.random()*packages.length)])
+  change(packages[Math.floor(Math.random()*packages.length)])
+  
+  app.once('tick', function () {
+    $('#loading').setAttribute('hidden', true)
+    $('#buttons').removeAttribute('hidden')
+  })
   
   app.on('tick', function () {
     material.uniforms.origin.value.copy(app.camera.position)
   })
   
-  window.packages = packages
-  window.change = setView
-  function setView(name) {
+  window.change = change
+  function change(name) {
     if (!name) {
       name = packages[Math.floor(Math.random()*packages.length)]
     }
@@ -190,33 +225,31 @@ function start(font, texture) {
       console.log("No module by name ", name)
       return
     }
+    
+    link.setAttribute('href', 'https://npmjs.org/package/' + name)
     looker.position.copy(pos)
     material.uniforms.currentWord.value = idx
     
-    transitionTo(app.camera.position, looker.position,
+    var target = looker.position
+    var end = target.clone()
+    var dir = target.clone().normalize()
+    var dist = radius * 2.05
+    end.add(dir.multiplyScalar(dist))
+    transitionTo(app.camera.position, end,
         lastIdx, idx)
   }
   
-  function transitionTo(start, target, lastIdx, idx) {
-    var dir = target.normalize()
-    var end = target.clone()
-    var dist = radius * 6
-    end.add(dir.multiplyScalar(dist))
+  function transitionTo(start, target) {
     
     var anim = {
       value: start.toArray(),
-      origin: start.toArray(),
-      index: lastIdx
     }
     tweenr.to(anim, { 
       duration: 1, 
       ease: easing, 
-      index: idx,
-      value: end.toArray(),
-      origin: target.toArray()
+      value: target.toArray(),
     })
       .on('update', function () {
-        // material.uniforms.currentWord.value = anim.index
         app.camera.position.fromArray(anim.value)
         app.controls.update()
         app.camera.updateProjectionMatrix()

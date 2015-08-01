@@ -1,0 +1,111 @@
+@font-face {
+  font-family: 'icomoon';
+  src:url('assets/icomoon.eot?-6db9w4');
+  src:url('assets/icomoon.eot?#iefix-6db9w4') format('embedded-opentype'),
+    url('assets/icomoon.ttf?-6db9w4') format('truetype'),
+    url('assets/icomoon.woff?-6db9w4') format('woff'),
+    url('assets/icomoon.svg?-6db9w4#icomoon') format('svg');
+  font-weight: normal;
+  font-style: normal;
+}
+
+[class^="icon-"], [class*=" icon-"] {
+  font-family: 'icomoon';
+  speak: none;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+
+  /* Better Font Rendering =========== */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-video-camera:before {
+  content: "\e914";
+}
+.icon-zoom-out:before {
+  content: "\e988";
+}
+.icon-link:before {
+  content: "\e9cb";
+}
+.icon-play2:before {
+  content: "\ea15";
+}
+.icon-shuffle:before {
+  content: "\ea30";
+}
+
+body {
+  overflow: hidden;
+  background: rgb(40, 40, 40);
+  padding: 0;
+  margin: 0;
+}
+
+#buttons {
+  position: absolute;
+  text-align: center;
+  bottom: 0;
+  font-size: 24px;
+  left: 0;
+  width: 100%;
+}
+
+#buttons > .button {
+  display: inline-block;
+  background: rgba(0,0,0,0.75);
+  cursor: pointer;
+  opacity: 0.8;
+  border-radius: 5%;
+  color: rgb(230,230,230);
+  border: 2px solid transparent;
+  padding: 10px;
+  box-sizing: border-box;
+  -webkit-transition: all 0.1s ease-out;
+  -moz-transition: all 0.1s ease-out;
+  -o-transition: all 0.1s ease-out;
+  -ms-transition: all 0.1s ease-out;
+  transition: all 0.1s ease-out;
+}
+
+#link {
+  color: inherit;
+  display: inline-block;
+  text-decoration: none;
+}
+
+#loading {
+  font-family: monospace;
+  font-size: 12px;
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  text-align: center;
+  color: white;
+}
+
+#twitter {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  color: white;
+  display: none;
+}
+
+#buttons > .button:hover {
+  opacity: 1.0;
+  border: 2px solid rgb(70, 70, 70);
+  border-radius: 15%;
+  -webkit-transition: all 0.1s ease-out;
+  -moz-transition: all 0.1s ease-out;
+  -o-transition: all 0.1s ease-out;
+  -ms-transition: all 0.1s ease-out;
+  transition: all 0.1s ease-out;
+}
