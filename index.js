@@ -1,5 +1,6 @@
 var packages = require('./top-modules')
 var random = require('gl-vec3/random')
+var COUNT = 4000
 
 global.THREE = require('three')
 var createOrbitViewer = require('three-orbit-viewer')(THREE)
@@ -30,9 +31,13 @@ function start(font, texture) {
       clearColor: 'rgb(40, 40, 40)',
       clearAlpha: 1.0,
       fov: 55,
+      contextAttributes: {
+        antialias: true,
+        depth: true,
+        alpha: false
+      },
       position: new THREE.Vector3(0, 0, -30)
   })
-
   var maxAni = app.renderer.getMaxAnisotropy()
 
   //setup our texture with some nice mipmapping etc
@@ -50,11 +55,14 @@ function start(font, texture) {
     smooth: 1/32, //the smooth value for SDF
     side: THREE.DoubleSide,
     transparent: true,
-    color: 'rgb(230, 230, 230)'
+    depthWrite: false,
+    depthRead: false,
+    depthTest: false,
+    color: 'rgb(255, 255, 255)'
   }))
   
   var positionLookup = {}
-  packages = packages.slice(0, 500)
+  packages = packages.slice(0, COUNT)
   var charCount = packages.reduce(function (prev, a) {
     return prev + a.length
   }, 0)
@@ -65,10 +73,20 @@ function start(font, texture) {
   var allUvs = new Float32Array(posCount)
   var allWordIndices = new Float32Array(4 * charCount)
   var allZPos = new Float32Array(4 * charCount)
-  var allIndices = require('quad-indices')(charCount)
+  
+  var tris = charCount * 6
+  var gl = app.renderer.getContext()
+  var hasInt = gl.getExtension('OES_element_index_uint')
+  var type = (hasInt && tris > 21845) ? 'uint32' : 'uint16'
+  
+  var allIndices = require('quad-indices')({
+    count: charCount,
+    type: type
+  })
+  
   var offsetPos = 0
   var scale = -0.005
-  
+  var detailLookup = {}
   material.uniforms.wordCount.value = packages.length
   
   packages.forEach(function (name, index) {
@@ -77,17 +95,15 @@ function start(font, texture) {
       align: 'center',
       text: name,  //the string to render
       font: font,  //the bitmap font definition
-      width: 1000, //optional width for word-wrap
     })
     
     var layout = geom.layout
     var positions = geom.attributes.position.array
     var uvs = geom.attributes.uv.array
-      
-    var relative = ((1 - index / (packages.length-1)) + 0.1) * (radius*1)
+    
+    var relative = ((1 - index / (packages.length-1)) + 0.25) * (radius*1)
     var moduleScale = scale * relative
     var rnd = random([], 10)
-    
     var rndPos = new THREE.Vector3().fromArray(rnd)
     var obj = new THREE.Object3D()
     obj.position.copy(rndPos)
@@ -95,6 +111,12 @@ function start(font, texture) {
     obj.updateMatrix()
     var targetPos = obj.position.clone()
     positionLookup[name] = targetPos
+    detailLookup[name] = {
+      layout: [ layout.width, layout.height ],
+      scale: moduleScale,
+      index: index,
+      count: positions.length
+    }
     // positionLookup[name] = [ rnd[0] * scale, rnd[1] * scale, rnd[2] * scale ]
     
     for (var i=0; i < positions.length/2; i++) {
@@ -144,6 +166,7 @@ function start(font, texture) {
   
   var looker = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial())
   app.scene.add(looker)
+  looker.scale.multiplyScalar(0.1)
   looker.visible = false
   
   setView(packages[Math.floor(Math.random()*packages.length)])
@@ -152,6 +175,7 @@ function start(font, texture) {
     material.uniforms.origin.value.copy(app.camera.position)
   })
   
+  window.packages = packages
   window.change = setView
   function setView(name) {
     if (!name) {
@@ -166,8 +190,8 @@ function start(font, texture) {
       console.log("No module by name ", name)
       return
     }
-    console.log(name)
     looker.position.copy(pos)
+    material.uniforms.currentWord.value = idx
     
     transitionTo(app.camera.position, looker.position,
         lastIdx, idx)
@@ -192,7 +216,7 @@ function start(font, texture) {
       origin: target.toArray()
     })
       .on('update', function () {
-        material.uniforms.currentWord.value = anim.index
+        // material.uniforms.currentWord.value = anim.index
         app.camera.position.fromArray(anim.value)
         app.controls.update()
         app.camera.updateProjectionMatrix()
